@@ -16,8 +16,8 @@ app.use(express.json());
 app.use("/auth", require("./routes/auth"));
 app.use("/voice", require("./routes/voice"));
 app.use("/speech", require("./routes/speech"));
-// app.use("/intent", require("./routes/intent"));
-// app.use("/transaction", require("./routes/transaction"));
+app.use("/intent", require("./routes/intent"));
+app.use("/transaction", require("./routes/transaction"));
 
 app.get("/", (req, res) => {
   res.send("Backend is running...");

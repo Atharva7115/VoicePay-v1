@@ -1,23 +1,51 @@
+
 const express = require("express");
-const router = express.Router();
+const bcrypt = require("bcryptjs");
 const User = require("../models/User");
-const Account = require("../models/Account");
 
-router.post("/test-create", async (req, res) => {
-  const user = await User.create({
-    phone: "9999999999",
-    bank: "SBI"
-  });
+const router = express.Router();
 
-  const account = await Account.create({
-    userId: user._id,
-    bankName: "SBI",
-    accountNumber: "1234567890",
-    upiId: "user@sbi",
-    balance: 8500
-  });
+/* ---------------- SET UPI PIN ---------------- */
+router.post("/set-pin", async (req, res) => {
+  try {
+    const { userId, pin } = req.body;
 
-  res.json({ user, account });
+    if (!userId || !pin) {
+      return res.status(400).json({
+        error: "userId and pin are required"
+      });
+    }
+
+    if (pin.length !== 4) {
+      return res.status(400).json({
+        error: "PIN must be 4 digits"
+      });
+    }
+
+    const user = await User.findById(userId);
+
+    if (!user) {
+      return res.status(404).json({
+        error: "User not found"
+      });
+    }
+
+    const hashedPin = await bcrypt.hash(pin, 10);
+
+    user.appPin = hashedPin;
+    await user.save();
+
+    res.json({
+      success: true,
+      message: "UPI PIN set successfully"
+    });
+
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({
+      error: "Failed to set PIN"
+    });
+  }
 });
 
 module.exports = router;

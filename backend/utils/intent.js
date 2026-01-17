@@ -1,33 +1,35 @@
-function extractIntent(text) {
-  const t = text.toLowerCase();
+const extractReceiver = require("./extractReceiver");
 
-  // balance intent
+function detectIntent(normalizedText) {
+  // BALANCE
   if (
-    t.includes("balance") ||
-    t.includes("paisa") ||
-    t.includes("money") ||
-    t.includes("kitne")
+    normalizedText.includes("balance") ||
+    normalizedText.includes("kitna") ||
+    normalizedText.includes("kitne")
   ) {
     return { intent: "BALANCE_CHECK" };
   }
 
-  // transfer intent
-  const amountMatch = t.match(/\d+/);
+  // TRANSFER
+  const amountMatch = normalizedText.match(/\d+/);
 
   if (
     amountMatch &&
-    (t.includes("send") ||
-     t.includes("bhej") ||
-     t.includes("transfer") ||
-     t.includes("pay"))
+    (
+      normalizedText.includes("send") ||
+      normalizedText.includes("bhej") ||
+      normalizedText.includes("transfer") ||
+      normalizedText.includes("pay")
+    )
   ) {
     return {
       intent: "MONEY_TRANSFER",
-      amount: Number(amountMatch[0])
+      amount: Number(amountMatch[0]),
+      receiver: extractReceiver(normalizedText)
     };
   }
 
   return { intent: "UNKNOWN" };
 }
 
-module.exports = extractIntent;
+module.exports = detectIntent;
