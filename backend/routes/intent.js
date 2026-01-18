@@ -1,13 +1,17 @@
 const express = require("express");
 const router = express.Router();
+
+console.log("✅ intent route file loaded");
 const PendingTransaction = require("../models/PendingTransaction");
+const Account = require("../models/Account");
+
 const normalizeText = require("../utils/normalizeText");
 const detectIntent = require("../utils/intent");
 const { getPrimaryBalance } = require("../services/balanceService");
 
-const { findReceiverAccount } = require("../services/receiverService");
-
-
+/* =====================================================
+   INTENT DETECTION ROUTE
+   ===================================================== */
 router.post("/detect", async (req, res) => {
   try {
     const { text, userId } = req.body;
@@ -18,66 +22,82 @@ router.post("/detect", async (req, res) => {
       });
     }
 
-    // 1️⃣ Normalize
+    // 1️⃣ Normalize text (Hindi + English safe)
     const normalizedText = normalizeText(text);
 
     // 2️⃣ Detect intent
     const intentData = detectIntent(normalizedText);
 
-    // 3️⃣ BALANCE CHECK
+    /* ---------------- BALANCE CHECK ---------------- */
     if (intentData.intent === "BALANCE_CHECK") {
       const balance = await getPrimaryBalance(userId);
 
       return res.json({
         intent: "BALANCE_CHECK",
-        message: `Your account balance is ₹${balance}`,
+        message: `आपका बैलेंस ₹${balance} है`,
         balance
       });
     }
 
-    // 4️⃣ MONEY TRANSFER (validation only)
+    /* ---------------- MONEY TRANSFER ---------------- */
     if (intentData.intent === "MONEY_TRANSFER") {
-  if (!intentData.amount || !intentData.receiver) {
-    return res.status(400).json({
-      error: "Amount or receiver missing"
-    });
-  }
+      if (!intentData.amount || !intentData.receiver) {
+        return res.status(400).json({
+          error: "Amount or receiver missing"
+        });
+      }
 
-  const receiverAccount = await findReceiverAccount(intentData.receiver);
+      // 🔒 TEMP DEMO RECEIVER MAP (Hindi + English)
+      const receiverMap = {
+        "rahul": "rahul@sbi",
+        "राहुल": "rahul@sbi"
+      };
 
-  if (!receiverAccount) {
-    return res.status(404).json({
-      error: "Receiver account not found"
-    });
-  }
+      const receiverKey = intentData.receiver.value.toLowerCase();
 
-  // Create pending transaction
-  const pendingTxn = await PendingTransaction.create({
-    senderId: userId,
-    receiverId: receiverAccount.userId,
-    amount: intentData.amount
-  });
+      if (!receiverMap[receiverKey]) {
+        return res.status(404).json({
+          error: "Receiver not found"
+        });
+      }
 
-  return res.json({
-    confirmationRequired: true,
-    transactionId: pendingTxn._id,
-    amount: intentData.amount,
-    receiver: {
-      upiId: receiverAccount.upiId,
-      bank: receiverAccount.bankName
-    },
-    message: `Do you want to send ₹${intentData.amount} to ${receiverAccount.upiId}?`
-  });
-}
+      const receiverAccount = await Account.findOne({
+        upiId: receiverMap[receiverKey]
+      });
 
-    // 5️⃣ FINAL FALLBACK
+      if (!receiverAccount) {
+        return res.status(404).json({
+          error: "Receiver account not found"
+        });
+      }
+
+      // ✅ Create pending transaction
+      const pendingTxn = await PendingTransaction.create({
+        senderId: userId,
+        receiverId: receiverAccount.userId,
+        amount: intentData.amount
+      });
+
+      return res.json({
+        confirmationRequired: true,
+        transactionId: pendingTxn._id,
+        amount: intentData.amount,
+        receiver: {
+          name: intentData.receiver,
+          upiId: receiverAccount.upiId
+        },
+        message: `₹${intentData.amount} भेजें ${intentData.receiver} को?`
+      });
+    }
+console.log("✅ Intent routes loaded");
+    /* ---------------- FALLBACK ---------------- */
     return res.json({
-      intent: intentData.intent,
-      message: "Unable to understand your request"
+      intent: "UNKNOWN",
+      message: "समझ नहीं पाया, कृपया फिर से बोलें"
     });
 
   } catch (err) {
-    console.error(err);
+    console.error("INTENT ERROR:", err);
     res.status(500).json({
       error: "Intent processing failed"
     });

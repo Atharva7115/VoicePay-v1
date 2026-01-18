@@ -1,31 +1,43 @@
 const extractReceiver = require("./extractReceiver");
 
-function detectIntent(normalizedText) {
+function detectIntent(text) {
   // BALANCE
   if (
-    normalizedText.includes("balance") ||
-    normalizedText.includes("kitna") ||
-    normalizedText.includes("kitne")
+    text.includes("balance") ||
+    text.includes("kitna") ||
+    text.includes("कितना")
   ) {
     return { intent: "BALANCE_CHECK" };
   }
 
-  // TRANSFER
-  const amountMatch = normalizedText.match(/\d+/);
+  // AMOUNT
+  const amountMatch = text.match(/\d+/);
 
-  if (
-    amountMatch &&
-    (
-      normalizedText.includes("send") ||
-      normalizedText.includes("bhej") ||
-      normalizedText.includes("transfer") ||
-      normalizedText.includes("pay")
-    )
-  ) {
+  // TRANSFER KEYWORDS (Hindi + English)
+  const transferWords = [
+    "bhej",
+    "bhejo",
+    "send",
+    "transfer",
+    "pay",
+    "de",
+    "do",
+    "ko"
+  ];
+
+  const isTransfer = transferWords.some(word => text.includes(word));
+
+  if (amountMatch && isTransfer) {
+    const receiver = extractReceiver(text);
+
+    if (!receiver) {
+      return { intent: "UNKNOWN" };
+    }
+
     return {
       intent: "MONEY_TRANSFER",
       amount: Number(amountMatch[0]),
-      receiver: extractReceiver(normalizedText)
+      receiver
     };
   }
 
@@ -33,3 +45,4 @@ function detectIntent(normalizedText) {
 }
 
 module.exports = detectIntent;
+
